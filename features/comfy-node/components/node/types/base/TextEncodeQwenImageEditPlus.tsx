@@ -11,6 +11,7 @@ import { Maximize2 } from 'lucide-react-native';
 import { useCallback, useRef } from 'react';
 import BaseNode from '../../common/base-node';
 import SubItem from '../../common/sub-item';
+import { useSettingsStore } from '@/store/settings-store';
 
 interface TextEncodeQwenImageEditPlusProps {
   node: Node;
@@ -24,6 +25,7 @@ export default function TextEncodeQwenImageEditPlus({
 }: TextEncodeQwenImageEditPlusProps) {
   const updateNodeInput = useWorkflowStore((state) => state.updateNodeInput);
   const promptEditorRef = useRef<PromptEditorModalRef>(null);
+  const expandPromptField = useSettingsStore((state) => state.expandPromptField);
 
   const handleTextChange = useCallback(
     (text: string) => {
@@ -56,6 +58,7 @@ export default function TextEncodeQwenImageEditPlus({
           placeholder="Enter prompt here..."
           value={node.inputs?.prompt || ''}
           onChangeText={handleTextChange}
+          minHeight={expandPromptField ? 128 : 64}
         />
       </SubItem>
       <PromptEditorModal ref={promptEditorRef} />

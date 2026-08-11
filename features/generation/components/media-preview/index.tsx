@@ -14,6 +14,7 @@ import { ProgressOverlay } from './progress-overlay';
 import { ZoomableMedia } from './zoomable-media';
 
 import { useGenerationProgress, useGenerationStatus } from '@/features/generation/context/generation-context';
+import { useSettingsStore } from '@/store/settings-store';
 
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { PlayCircle } from 'lucide-react-native';
@@ -54,7 +55,9 @@ export const MediaPreview = memo(function ParallaxMedia({
   workflowId,
   serverId,
 }: ParallaxMediaProps) {
-  const { generatedMedia, status } = useGenerationStatus();
+  const { generatedMedia, status, previewImage } = useGenerationStatus();
+  const showLivePreviews = useSettingsStore((s) => s.showLivePreviews);
+  const activePreview = showLivePreviews ? previewImage : undefined;
   const { progress } = useGenerationProgress();
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
@@ -260,6 +263,19 @@ export const MediaPreview = memo(function ParallaxMedia({
               />
             </ModalContent>
           </Modal>
+        </View>
+      ) : activePreview ? (
+        <View className="h-full w-full items-center justify-center bg-black">
+          <Image
+            source={{ uri: activePreview }}
+            style={{
+              width: containerSize.width || screenWidth,
+              height: containerSize.height || screenHeight,
+              aspectRatio: undefined,
+            }}
+            contentFit="contain"
+            cachePolicy="none"
+          />
         </View>
       ) : (
         <View className="h-full w-full items-center justify-center bg-background-0">

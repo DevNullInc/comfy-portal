@@ -7,6 +7,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 interface WorkflowStoreState {
   workflow: WorkflowRecord[];
+  tempValidationWorkflow: any;
   addWorkflow: (preset: Omit<WorkflowRecord, 'id' | 'createdAt'>) => void;
   removeWorkflow: (id: string) => void;
   updateWorkflow: (id: string, updates: Partial<Omit<WorkflowRecord, 'id'>>) => void;
@@ -14,12 +15,19 @@ interface WorkflowStoreState {
   updateNodeInput: (workflowId: string, nodeId: string, inputKey: string, value: any) => void;
   restoreWorkflowData: (workflowId: string, data: Workflow) => void;
   clearServerSyncedWorkflows: (serverId: string) => void;
+  setTempValidationWorkflow: (workflow: any) => void;
+  clearTempValidationWorkflow: () => void;
 }
 
 export const useWorkflowStore = create<WorkflowStoreState>()(
   persist(
     (set) => ({
       workflow: [],
+      tempValidationWorkflow: null,
+
+      setTempValidationWorkflow: (workflow) => set({ tempValidationWorkflow: workflow }),
+      clearTempValidationWorkflow: () => set({ tempValidationWorkflow: null }),
+
 
       addWorkflow: (workflow) => {
         const newWorkflow: WorkflowRecord = {

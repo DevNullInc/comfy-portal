@@ -12,6 +12,7 @@ import { AlertCircle, GitPullRequest } from 'lucide-react-native';
 import { TouchableOpacity } from 'react-native';
 import BaseNode from './base-node';
 import SubItem from './sub-item';
+import { ModelSelector } from '@/components/common/selectors/model';
 
 interface UnknownNodeProps {
   node: Node;
@@ -35,6 +36,42 @@ export default function UnknownNode({ node, serverId, workflowId }: UnknownNodeP
 
   const renderInput = (key: string, value: any) => {
     if (typeof value === 'string') {
+      // Check if value ends with a model file extension
+      const isModelFile = value.endsWith('.safetensors') || 
+                          value.endsWith('.ckpt') || 
+                          value.endsWith('.pt') || 
+                          value.endsWith('.bin') ||
+                          value.endsWith('.vae.pt');
+
+      if (isModelFile) {
+        const lowerKey = key.toLowerCase();
+        let modelType: string | string[] = 'checkpoints';
+        if (lowerKey.includes('lora')) {
+          modelType = 'loras';
+        } else if (lowerKey.includes('vae')) {
+          modelType = 'vae';
+        } else if (lowerKey.includes('unet') || lowerKey.includes('diffusion') || lowerKey.includes('model')) {
+          modelType = 'diffusion_models';
+        } else if (lowerKey.includes('upscale')) {
+          modelType = 'upscale_models';
+        } else if (lowerKey.includes('controlnet')) {
+          modelType = 'controlnet';
+        }
+
+        return (
+          <SubItem key={key} title={key}>
+            <ModelSelector
+              value={value}
+              onChange={(newValue) => {
+                updateNodeInput(workflowId, node.id, key, newValue);
+              }}
+              type={modelType}
+              serverId={serverId}
+            />
+          </SubItem>
+        );
+      }
+
       // Use Switch for 'enable'/'disable' values
       if (value === 'enable' || value === 'disable') {
         return (

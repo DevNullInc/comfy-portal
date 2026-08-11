@@ -9,6 +9,7 @@ import { Node } from '@/features/workflow/types';
 import { ComfyClient, QueueResponse } from '@/services/comfy-client';
 import { saveGeneratedMedia } from '@/services/image-storage';
 import { showToast } from '@/utils/toast';
+import { logDebug } from '@/store/settings-store';
 
 interface GenerationState {
   status: 'idle' | 'generating' | 'downloading' | 'error' | 'success';
@@ -46,6 +47,7 @@ interface GenerationStatus {
   currentNodeId?: string;
   generatedMedia: string[];
   queueRemaining: number;
+  previewImage?: string;
 }
 
 interface GenerationProgress {
@@ -93,6 +95,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
   const handleProgress = useCallback(
     (value: number, max: number) => {
       const percent = (value / max) * 100;
+      logDebug('info', `Sampler sampling progress: ${value}/${max} steps (${Math.round(percent)}%)`);
       if (
         value === 1 || // Start
         value === max || // End
@@ -109,6 +112,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
 
   const handleNodeProgress = useCallback(
     (completed: number, total: number) => {
+      logDebug('info', `Workflow execution progress: Node ${completed}/${total} completed`);
       debouncedSetProgress({
         nodeProgress: { completed, total },
       });
@@ -125,6 +129,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
       ...prev,
       status: 'idle',
       currentNodeId: undefined,
+      previewImage: undefined,
       // Note: queueRemaining is NOT reset here — it's managed by the persistent WebSocket listener
     }));
     lastProgressPercentRef.current = 0;
@@ -193,6 +198,7 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
       }
 
       try {
+        logDebug('info', `Initializing workflow execution (Workflow ID: ${workflowId}, Server: ${serverId})`);
         reset();
         setStatus((prev) => ({ ...prev, status: 'generating' }));
 
@@ -213,8 +219,11 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
 
         if (!comfyClient.current.isConnected()) {
           try {
+            logDebug('info', 'WebSocket client not connected. Attempting connection...');
             await comfyClient.current.connect();
-          } catch (error) {
+            logDebug('info', 'WebSocket connection established successfully.');
+          } catch (error: any) {
+            logDebug('error', `WebSocket connection failed: ${error.message || error}`);
             console.error('Failed to connect to server:', error);
             showToast.error(
               'Connection Failed',
@@ -229,23 +238,30 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
         await comfyClient.current.generate(workflowForExecution, {
           onProgress: handleProgress,
           onNodeStart: (nodeId) => {
+            logDebug('info', `Node execution started: ${nodeId}`);
             setStatus((prev) => ({ ...prev, currentNodeId: nodeId }));
           },
           onNodeComplete: (node, completed, total) => {
             handleNodeProgress(completed, total);
           },
           onDownloadProgress: (_, progress) => {
+            logDebug('info', `Downloading output files: ${Math.round(progress * 100)}%`);
             setStatus((prev) => {
               if (prev.status === 'downloading') return prev;
-              return { ...prev, status: 'downloading' };
+              return { ...prev, status: 'downloading', previewImage: undefined };
             });
             debouncedSetProgress({ downloadProgress: progress });
+          },
+          onPreviewImage: (dataUrl) => {
+            logDebug('info', `Received live preview frame (size: ${dataUrl.length} bytes)`);
+            setStatus((prev) => ({ ...prev, previewImage: dataUrl }));
           },
           onComplete: async (mediaUrls) => {
             try {
               useWorkflowStore.getState().updateUsage(workflowId);
 
               if (mediaUrls.length > 0) {
+                logDebug('info', `Workflow execution completed. Outputs ready: ${mediaUrls.join(', ')}`);
                 debouncedSetProgress({
                   progress: { value: progress.progress.max, max: progress.progress.max },
                 });
@@ -301,7 +317,8 @@ export function GenerationProvider({ children }: { children: React.ReactNode }) 
             }
           },
         });
-      } catch (error) {
+      } catch (error: any) {
+        logDebug('error', `Generation failed: ${error.message || error}`);
         console.error('Generation error:', error);
         showToast.error(
           'Generation Failed',

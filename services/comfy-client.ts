@@ -4,6 +4,8 @@ import { generateUUID } from '@/utils/uuid';
 import * as FileSystem from 'expo-file-system/legacy';
 import { Platform } from 'react-native';
 import { buildServerUrl, fetchWithAuth, isLocalOrLanIP } from './network';
+import { Buffer } from 'buffer';
+
 
 /**
  * Configuration options for the ComfyUI client
@@ -52,6 +54,12 @@ interface ProgressCallback {
    * @param progress - Download progress percentage (0-100)
    */
   onDownloadProgress?: (filename: string, progress: number) => void;
+
+  /**
+   * Called when a real-time preview image is available
+   * @param dataUrl - Base64 data URL of the preview image
+   */
+  onPreviewImage?: (dataUrl: string) => void;
 }
 
 export type ConnectionStatus = 'connected' | 'connecting' | 'disconnected';
@@ -159,9 +167,18 @@ export class ComfyClient {
   private setupWebSocket(wsUrl: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this.ws = new WebSocket(wsUrl);
+      this.ws.binaryType = 'arraybuffer';
 
       this.ws.onopen = () => {
         this.reconnectAttempts = 0;
+        // Send feature flags to negotiate capabilities
+        const msg = {
+          type: 'feature_flags',
+          data: {
+            supports_preview_metadata: true,
+          },
+        };
+        this.ws?.send(JSON.stringify(msg));
         resolve();
       };
 
@@ -294,6 +311,28 @@ export class ComfyClient {
 
       const handleMessage = (event: MessageEvent) => {
         try {
+          // Handle binary messages (previews)
+          if (event.data instanceof ArrayBuffer) {
+            const view = new DataView(event.data);
+            const eventType = view.getUint32(0, false); // false = big-endian uint32
+            if (eventType === 1 || eventType === 4) {
+              let imageBytes: Uint8Array;
+              let formatType = 1; // 1 = JPEG, 2 = PNG
+              if (eventType === 1) {
+                formatType = view.getUint32(4, false);
+                imageBytes = new Uint8Array(event.data, 8);
+              } else {
+                const metaLength = view.getUint32(4, false);
+                imageBytes = new Uint8Array(event.data, 8 + metaLength);
+              }
+              const base64 = Buffer.from(imageBytes).toString('base64');
+              const mimeType = formatType === 2 ? 'image/png' : 'image/jpeg';
+              const dataUrl = `data:${mimeType};base64,${base64}`;
+              callbacks.onPreviewImage?.(dataUrl);
+            }
+            return;
+          }
+
           // Skip non-JSON messages
           if (typeof event.data !== 'string' || event.data.startsWith('o') || event.data === '[]' || event.data.startsWith('primus')) {
             return;
@@ -302,7 +341,7 @@ export class ComfyClient {
           const message = JSON.parse(event.data);
 
           // Only process whitelisted message types
-          const validMessageTypes = ['progress', 'execution_cached', 'executing', 'execution_error', 'executed', 'execution_success'] as const;
+          const validMessageTypes = ['progress', 'execution_cached', 'executing', 'execution_error', 'executed', 'execution_success', 'execution_interrupted'] as const;
           if (!validMessageTypes.includes(message.type)) {
             return;
           }
@@ -342,6 +381,12 @@ export class ComfyClient {
               const nodeType = message.data?.node_type;
               const detail = nodeType ? `[${nodeType}] ${errorMsg}` : errorMsg;
               resolve({ success: false, error: detail.trim() });
+              break;
+            }
+
+            case 'execution_interrupted': {
+              this.ws?.removeEventListener('message', handleMessage);
+              resolve({ success: false, error: 'Execution interrupted' });
               break;
             }
 
@@ -431,9 +476,12 @@ export class ComfyClient {
     }
     const url = await buildServerUrl(this.useSSL, this.host, this.port, path);
 
-    // On web, skip file system download — just return the URL directly
-    // The browser can load remote images via <img src="...">
-    if (Platform.OS === 'web') {
+    // Check disableMediaCache setting dynamically
+    const { useSettingsStore } = require('@/store/settings-store');
+    const disableMediaCache = useSettingsStore.getState().disableMediaCache;
+
+    // On web or if media cache is disabled, skip file system download — just return the URL directly
+    if (Platform.OS === 'web' || disableMediaCache) {
       return url;
     }
 

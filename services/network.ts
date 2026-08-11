@@ -128,7 +128,7 @@ export function validateHost(host: string): string {
  */
 export function validatePort(port: string): string {
   if (port.length === 0) {
-    return 'Port is required';
+    return ''; // Optional
   }
   const portNum = parseInt(port, 10);
   if (isNaN(portNum)) {

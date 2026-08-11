@@ -244,3 +244,78 @@ export const getAndConvertWorkflow = async (serverId: string, filename: string):
     throw error;
   }
 };
+
+export const getRawWorkflow = async (serverId: string, filename: string): Promise<any> => {
+  try {
+    const server = useServersStore.getState().servers.find((s) => s.id === serverId);
+    if (!server) {
+      throw new Error('Server not found');
+    }
+
+    const params = new URLSearchParams();
+    params.append('filename', filename);
+
+    const url = await buildServerUrl(server.useSSL, server.host, server.port, `/cpe/workflow/get?${params.toString()}`);
+
+    const response = await fetchWithAuth(url, server.token, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to get raw workflow: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    if (data.status !== 'success') {
+      throw new Error(`Failed to get raw workflow: ${data.message || 'unknown error'}`);
+    }
+
+    const workflowObj = typeof data.workflow === 'string' ? JSON.parse(data.workflow) : data.workflow;
+    return workflowObj;
+  } catch (error) {
+    console.warn('Error getting raw workflow:', error);
+    throw error;
+  }
+};
+
+export const saveWorkflowToServer = async (serverId: string, filename: string, workflowJson: any): Promise<void> => {
+  try {
+    const server = useServersStore.getState().servers.find((s) => s.id === serverId);
+    if (!server) {
+      throw new Error('Server not found');
+    }
+
+    const url = await buildServerUrl(server.useSSL, server.host, server.port, '/cpe/workflow/save');
+
+    const payload = {
+      workflow: typeof workflowJson === 'string' ? workflowJson : JSON.stringify(workflowJson),
+      name: filename,
+    };
+
+    const response = await fetchWithAuth(url, server.token, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Failed to save workflow to server: ${response.status} ${errorText}`);
+    }
+
+    const data = await response.json();
+    if (data.status !== 'success') {
+      throw new Error(`Failed to save workflow to server: ${data.message || 'unknown error'}`);
+    }
+  } catch (error) {
+    console.warn('Error saving workflow to server:', error);
+    throw error;
+  }
+};
+

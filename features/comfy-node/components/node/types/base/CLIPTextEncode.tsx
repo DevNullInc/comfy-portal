@@ -12,6 +12,7 @@ import { useCallback, useRef } from 'react';
 import { View } from 'react-native';
 import BaseNode from '../../common/base-node';
 import SubItem from '../../common/sub-item';
+import { useSettingsStore } from '@/store/settings-store';
 
 interface CLIPTextEncodeProps {
   node: Node;
@@ -22,6 +23,7 @@ interface CLIPTextEncodeProps {
 export default function CLIPTextEncode({ node, serverId, workflowId }: CLIPTextEncodeProps) {
   const updateNodeInput = useWorkflowStore((state) => state.updateNodeInput);
   const promptEditorRef = useRef<PromptEditorModalRef>(null);
+  const expandPromptField = useSettingsStore((state) => state.expandPromptField);
 
   const handleTextChange = (text: string) => {
     updateNodeInput(workflowId, node.id, 'text', text);
@@ -56,7 +58,7 @@ export default function CLIPTextEncode({ node, serverId, workflowId }: CLIPTextE
           isReadOnly={false}
           isInvalid={false}
           isDisabled={false}
-          className="w-full rounded-md border-0 bg-background-50"
+          className={`w-full rounded-md border-0 bg-background-50 ${expandPromptField ? 'h-32' : 'h-16'}`}
         >
           <TextareaInput
             placeholder="Enter text here..."

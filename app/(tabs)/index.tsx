@@ -10,7 +10,8 @@ import { VStack } from '@/components/ui/vstack';
 import { AddServerModal, type AddServerModalRef } from '@/features/server/components/add-server-modal';
 import { ServerCard } from '@/features/server/components/server-card';
 import { useServersStore } from '@/features/server/stores/server-store';
-import { Link } from 'expo-router';
+import { useSettingsStore } from '@/store/settings-store';
+import { Link, useRouter } from 'expo-router';
 import { ArrowRight, Plus, RefreshCcw, ScanSearch } from 'lucide-react-native';
 import { MotiView } from 'moti';
 import React, { useRef, useState } from 'react';
@@ -19,6 +20,17 @@ export default function HomeScreen() {
   const addServerModalRef = useRef<AddServerModalRef>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { servers, refreshServer } = useServersStore();
+  const autoConnectServerId = useSettingsStore((s) => s.autoConnectServerId);
+  const router = useRouter();
+
+  React.useEffect(() => {
+    if (autoConnectServerId) {
+      const server = servers.find((s) => s.id === autoConnectServerId);
+      if (server && server.status === 'online') {
+        router.push(`/workflow/${server.id}`);
+      }
+    }
+  }, [autoConnectServerId, servers]);
 
   const handleRefreshServers = async () => {
     setIsRefreshing(true);

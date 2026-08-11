@@ -16,9 +16,10 @@ import { generateUUID } from '@/utils/uuid';
 import * as DocumentPicker from 'expo-document-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
-import { CheckCircle, Clipboard, FileJson, ImagePlus } from 'lucide-react-native';
+import { CheckCircle, Clipboard, FileJson, ImagePlus, Sliders, Eye } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 interface AddWorkflowModalProps {
   isOpen: boolean;
@@ -28,12 +29,32 @@ interface AddWorkflowModalProps {
 
 export function ImportWorkflowModal({ isOpen, onClose, serverId }: AddWorkflowModalProps) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const [name, setName] = useState('New Workflow');
   const [thumbnail, setThumbnail] = useState('');
   const [error, setError] = useState('');
   const [workflowData, setWorkflowData] = useState<any>(null);
   const [uploadedFileName, setUploadedFileName] = useState('');
   const addWorkflow = useWorkflowStore((state) => state.addWorkflow);
+  const tempValidationWorkflow = useWorkflowStore((state) => state.tempValidationWorkflow);
+  const setTempValidationWorkflow = useWorkflowStore((state) => state.setTempValidationWorkflow);
+  const clearTempValidationWorkflow = useWorkflowStore((state) => state.clearTempValidationWorkflow);
+
+  // Sync workflowData when tempValidationWorkflow changes (e.g. edited in the visual editor)
+  useEffect(() => {
+    if (tempValidationWorkflow) {
+      try {
+        setWorkflowData((prev: any) => ({
+          addMethod: prev?.addMethod || 'file',
+          data: parseWorkflowTemplate(tempValidationWorkflow),
+        }));
+      } catch (err) {
+        console.error('Failed to parse validation workflow:', err);
+      }
+    } else {
+      setWorkflowData(null);
+    }
+  }, [tempValidationWorkflow]);
 
   useEffect(() => {
     if (name.trim().length > 50) {
@@ -123,6 +144,7 @@ export function ImportWorkflowModal({ isOpen, onClose, serverId }: AddWorkflowMo
     setError('');
     setWorkflowData(null);
     setUploadedFileName('');
+    clearTempValidationWorkflow();
     onClose();
   };
 
@@ -141,12 +163,13 @@ export function ImportWorkflowModal({ isOpen, onClose, serverId }: AddWorkflowMo
       const fileContent = await new File(result.assets[0].uri).text();
       const jsonData = JSON.parse(fileContent);
 
+      setTempValidationWorkflow(jsonData);
+      setUploadedFileName(result.assets[0].name);
+      setName(result.assets[0].name.replace(/\.json$/i, ''));
       setWorkflowData({
         addMethod: 'file',
         data: parseWorkflowTemplate(jsonData),
       });
-      setUploadedFileName(result.assets[0].name);
-      setName(result.assets[0].name);
     } catch (error) {
       console.error('Failed to import workflow file:', error);
       showToast.error('Import Failed', 'Please make sure it is a valid workflow JSON file.', insets.top);
@@ -169,11 +192,12 @@ export function ImportWorkflowModal({ isOpen, onClose, serverId }: AddWorkflowMo
 
       const jsonData = JSON.parse(clipboardContent);
 
+      setTempValidationWorkflow(jsonData);
+      setUploadedFileName('Imported from clipboard');
       setWorkflowData({
         addMethod: 'clipboard',
         data: parseWorkflowTemplate(jsonData),
       });
-      setUploadedFileName('Imported from clipboard');
     } catch (error) {
       console.error('Failed to import workflow from clipboard:', error);
       showToast.error('Import Failed', 'Please make sure you have copied a valid workflow JSON.', insets.top);
@@ -241,6 +265,31 @@ export function ImportWorkflowModal({ isOpen, onClose, serverId }: AddWorkflowMo
                 {workflowData?.addMethod === 'clipboard' ? 'Imported from Clipboard' : 'Import from Clipboard'}
               </ButtonText>
             </Button>
+
+            {tempValidationWorkflow && (
+              <HStack space="xs" className="mt-1 w-full">
+                <Button
+                  variant="outline"
+                  onPress={() => {
+                    router.push(`/workflow/${serverId}/viewer?mode=validation`);
+                  }}
+                  className="flex-1 rounded-md border-primary-500 bg-transparent active:bg-primary-50"
+                >
+                  <ButtonIcon as={Eye} size="md" className="text-primary-500" />
+                  <ButtonText className="text-primary-500">View Graph (Lite)</ButtonText>
+                </Button>
+                <Button
+                  variant="outline"
+                  onPress={() => {
+                    router.push(`/workflow/${serverId}/editor?mode=validation`);
+                  }}
+                  className="flex-1 rounded-md border-primary-500 bg-transparent active:bg-primary-50"
+                >
+                  <ButtonIcon as={Sliders} size="md" className="text-primary-500" />
+                  <ButtonText className="text-primary-500">Edit Canvas</ButtonText>
+                </Button>
+              </HStack>
+            )}
           </VStack>
 
           <VStack space="xs">

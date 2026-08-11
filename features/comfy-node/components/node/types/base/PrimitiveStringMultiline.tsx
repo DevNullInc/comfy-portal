@@ -11,6 +11,7 @@ import { Maximize2 } from 'lucide-react-native';
 import { useCallback, useRef } from 'react';
 import BaseNode from '../../common/base-node';
 import SubItem from '../../common/sub-item';
+import { useSettingsStore } from '@/store/settings-store';
 
 interface PrimitiveStringMultilineProps {
   node: Node;
@@ -21,6 +22,7 @@ interface PrimitiveStringMultilineProps {
 export default function PrimitiveStringMultiline({ node, workflowId }: PrimitiveStringMultilineProps) {
   const updateNodeInput = useWorkflowStore((state) => state.updateNodeInput);
   const promptEditorRef = useRef<PromptEditorModalRef>(null);
+  const expandPromptField = useSettingsStore((state) => state.expandPromptField);
 
   const handleTextChange = useCallback(
     (text: string) => {
@@ -52,7 +54,7 @@ export default function PrimitiveStringMultiline({ node, workflowId }: Primitive
           isReadOnly={false}
           isInvalid={false}
           isDisabled={false}
-          className="w-full rounded-md border-0 bg-background-50"
+          className={`w-full rounded-md border-0 bg-background-50 ${expandPromptField ? 'h-32' : 'h-16'}`}
         >
           <TextareaInput
             placeholder="Enter text here..."

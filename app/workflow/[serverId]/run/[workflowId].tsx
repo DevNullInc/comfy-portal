@@ -1,7 +1,11 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Images, Search, ServerCrash, Trash2 } from 'lucide-react-native';
+import { Edit3, Images, Search, ServerCrash, Trash2, Sliders, ArrowUp, ArrowDown, Eye, EyeOff, X } from 'lucide-react-native';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
+import { Switch } from '@/components/ui/switch';
+import { Modal, ModalBackdrop, ModalContent, ModalHeader, ModalBody } from '@/components/ui/modal';
+import { ScrollView } from '@/components/ui/scroll-view';
+import { showToast } from '@/utils/toast';
 
 import { HStack } from '@/components/ui/hstack';
 import { Icon } from '@/components/ui/icon';
@@ -28,7 +32,7 @@ import { useResolvedTheme } from '@/store/theme';
 import { useDeviceLayout } from '@/hooks/useDeviceLayout';
 import BottomSheet from '@gorhom/bottom-sheet';
 
-import { Button } from '@/components/ui/button';
+import { Button, ButtonText } from '@/components/ui/button';
 
 function NodesTabContent({
   nodes,
@@ -39,6 +43,7 @@ function NodesTabContent({
   theme,
   targetNodeId,
   sharedImageUri,
+  onOpenLayoutConfig,
 }: {
   nodes: any[];
   searchQuery: string;
@@ -48,6 +53,7 @@ function NodesTabContent({
   theme: string;
   targetNodeId?: string;
   sharedImageUri?: string;
+  onOpenLayoutConfig?: () => void;
 }) {
   const scrollRef = useRef<any>(null);
   const nodePositions = useRef<Record<string, number>>({});
@@ -102,26 +108,37 @@ function NodesTabContent({
   return (
     <View className="flex-1 bg-background-0">
       <View className="px-4 pt-4 pb-2 bg-background-0">
-        <HStack
-          className="items-center rounded-lg bg-background-0 px-3 py-3"
-          style={{
-            borderWidth: 1,
-            borderColor: theme === 'light' ? Colors.light.outline[50] : Colors.dark.outline[50],
-          }}
-        >
-          <Icon as={Search} size="sm" className="text-typography-400 mr-2" />
-          <AdaptiveTextInput
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder="Search nodes..."
-            placeholderTextColor={theme === 'light' ? Colors.light.typography[400] : Colors.dark.typography[400]}
+        <HStack space="xs" className="items-center">
+          <HStack
+            className="flex-1 items-center rounded-lg bg-background-0 px-3 py-3"
             style={{
-              flex: 1,
-              color: theme === 'light' ? Colors.light.typography[900] : Colors.dark.typography[900],
-              fontSize: 14,
-              padding: 0,
+              borderWidth: 1,
+              borderColor: theme === 'light' ? Colors.light.outline[50] : Colors.dark.outline[50],
             }}
-          />
+          >
+            <Icon as={Search} size="sm" className="text-typography-400 mr-2" />
+            <AdaptiveTextInput
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              placeholder="Search nodes..."
+              placeholderTextColor={theme === 'light' ? Colors.light.typography[400] : Colors.dark.typography[400]}
+              style={{
+                flex: 1,
+                color: theme === 'light' ? Colors.light.typography[900] : Colors.dark.typography[900],
+                fontSize: 14,
+                padding: 0,
+              }}
+            />
+          </HStack>
+          {onOpenLayoutConfig && (
+            <Button
+              variant="outline"
+              className="h-11 w-11 rounded-xl p-0 border-primary-500 bg-background-0 active:bg-background-50"
+              onPress={onOpenLayoutConfig}
+            >
+              <Icon as={Sliders} size="sm" className="text-primary-500" />
+            </Button>
+          )}
         </HStack>
       </View>
       <AdaptiveKeyboardAwareScrollView
@@ -147,6 +164,7 @@ function RunWorkflowScreenContent() {
   const theme = useResolvedTheme();
   const server = useServersStore((state) => state.servers.find((s) => s.id === serverId));
   const workflowRecord = useWorkflowStore((state) => state.workflow.find((p) => p.id === workflowId));
+  const updateWorkflow = useWorkflowStore((state) => state.updateWorkflow);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
   const snapPoints = useMemo(() => ['30%', '60%', '80%'], []);
@@ -188,14 +206,35 @@ function RunWorkflowScreenContent() {
     sheetSnapIndexRef.current = index;
   }, []);
 
+  const uiConfig = workflowRecord?.metadata?.uiConfig;
+
   const nodes = useMemo(() => {
     if (!workflowRecord) return [];
     const allNodes = Object.values(workflowRecord.data);
-    const sorted = allNodes.sort((a: any, b: any) => {
-      const aId = parseInt(a.id);
-      const bId = parseInt(b.id);
-      return aId - bId;
-    });
+    
+    // Sort nodes based on user's nodeOrder or default ID-based sorting
+    let sorted = [...allNodes];
+    if (uiConfig?.nodeOrder && uiConfig.nodeOrder.length > 0) {
+      sorted.sort((a: any, b: any) => {
+        const indexA = uiConfig.nodeOrder.indexOf(a.id);
+        const indexB = uiConfig.nodeOrder.indexOf(b.id);
+        const valA = indexA === -1 ? 999999 : indexA;
+        const valB = indexB === -1 ? 999999 : indexB;
+        return valA - valB;
+      });
+    } else {
+      sorted.sort((a: any, b: any) => {
+        const aId = parseInt(a.id);
+        const bId = parseInt(b.id);
+        return aId - bId;
+      });
+    }
+
+    // Filter by visibility list (if configured)
+    if (uiConfig?.visibleNodeIds) {
+      sorted = sorted.filter((node: any) => uiConfig.visibleNodeIds.includes(node.id));
+    }
+
     if (!searchQuery) return sorted;
     const lowerQuery = searchQuery.toLowerCase();
     return sorted.filter((node: any) => {
@@ -207,7 +246,78 @@ function RunWorkflowScreenContent() {
         type.toLowerCase().includes(lowerQuery) ||
         inputs.toLowerCase().includes(lowerQuery);
     });
-  }, [workflowRecord, searchQuery]);
+  }, [workflowRecord, searchQuery, uiConfig]);
+
+  // Layout Config Modal state
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [tempVisibleIds, setTempVisibleIds] = useState<string[]>([]);
+  const [tempOrder, setTempOrder] = useState<string[]>([]);
+
+  const handleOpenConfig = useCallback(() => {
+    if (!workflowRecord) return;
+    const allNodes = Object.values(workflowRecord.data);
+    const defaultSortedIds = [...allNodes]
+      .sort((a: any, b: any) => parseInt(a.id) - parseInt(b.id))
+      .map((n: any) => n.id);
+
+    const visibleIds = workflowRecord.metadata?.uiConfig?.visibleNodeIds ?? defaultSortedIds;
+    const order = workflowRecord.metadata?.uiConfig?.nodeOrder ?? defaultSortedIds;
+
+    // Ensure all node IDs are present in order
+    const mergedOrder = [...order];
+    defaultSortedIds.forEach((id) => {
+      if (!mergedOrder.includes(id)) {
+        mergedOrder.push(id);
+      }
+    });
+
+    setTempVisibleIds(visibleIds);
+    setTempOrder(mergedOrder);
+    setIsConfigOpen(true);
+  }, [workflowRecord]);
+
+  const handleSaveConfig = () => {
+    if (!workflowRecord) return;
+    updateWorkflow(workflowRecord.id, {
+      metadata: {
+        ...workflowRecord.metadata,
+        uiConfig: {
+          visibleNodeIds: tempVisibleIds,
+          nodeOrder: tempOrder,
+        },
+      },
+    });
+    setIsConfigOpen(false);
+    showToast.success('Layout Updated', 'UI customization saved successfully.');
+  };
+
+  const handleResetConfig = () => {
+    if (!workflowRecord) return;
+    const allNodes = Object.values(workflowRecord.data);
+    const defaultSortedIds = [...allNodes]
+      .sort((a: any, b: any) => parseInt(a.id) - parseInt(b.id))
+      .map((n: any) => n.id);
+
+    setTempVisibleIds(defaultSortedIds);
+    setTempOrder(defaultSortedIds);
+  };
+
+  const toggleVisibility = (nodeId: string) => {
+    setTempVisibleIds((prev) =>
+      prev.includes(nodeId) ? prev.filter((id) => id !== nodeId) : [...prev, nodeId]
+    );
+  };
+
+  const moveNode = (index: number, direction: 'up' | 'down') => {
+    const newOrder = [...tempOrder];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex >= 0 && targetIndex < newOrder.length) {
+      const temp = newOrder[index];
+      newOrder[index] = newOrder[targetIndex];
+      newOrder[targetIndex] = temp;
+      setTempOrder(newOrder);
+    }
+  };
 
   // Early returns after all hooks
   if (!workflowRecord) {
@@ -244,6 +354,41 @@ function RunWorkflowScreenContent() {
         }
         rightElement={
           <HStack className="items-center" space="xs">
+            {/* View Graph (Lite) Button */}
+            <Button
+              variant="link"
+              className="h-9 w-9 rounded-xl p-0"
+              onPress={() => {
+                if (workflowRecord.addMethod === 'server-sync' && workflowRecord.metadata?.originalFilename) {
+                  router.push(
+                    `/workflow/${serverId}/viewer?mode=edit&filename=${encodeURIComponent(
+                      workflowRecord.metadata.originalFilename
+                    )}`
+                  );
+                } else {
+                  useWorkflowStore.getState().setTempValidationWorkflow(workflowRecord.data);
+                  router.push(`/workflow/${serverId}/viewer?mode=validation`);
+                }
+              }}
+            >
+              <Icon as={Eye} size="md" className="text-primary-500" />
+            </Button>
+
+            {workflowRecord.addMethod === 'server-sync' && workflowRecord.metadata?.originalFilename && (
+              <Button
+                variant="link"
+                className="h-9 w-9 rounded-xl p-0"
+                onPress={() =>
+                  router.push(
+                    `/workflow/${serverId}/editor?mode=edit&filename=${encodeURIComponent(
+                      workflowRecord.metadata.originalFilename
+                    )}`
+                  )
+                }
+              >
+                <Icon as={Edit3} size="md" className="text-primary-500" />
+              </Button>
+            )}
             <Button variant="link" className="h-9 w-9 rounded-xl p-0" onPress={() => setIsHistoryOpen(true)}>
               <Icon as={Images} size="md" className="text-primary-500" />
             </Button>
@@ -283,16 +428,24 @@ function RunWorkflowScreenContent() {
             <BottomSheetProvider isInSheet={false}>
               <View style={{ flex: 1 }}>
                 {tabIndex === 0 ? (
-                    <NodesTabContent
-                      nodes={nodes}
-                      searchQuery={searchQuery}
-                      setSearchQuery={setSearchQuery}
-                      serverId={serverId as string}
-                      workflowId={workflowId as string}
-                      theme={theme}
-                      targetNodeId={targetNodeId}
-                      sharedImageUri={sharedImageUri}
-                    />
+                    <AdaptiveKeyboardAwareScrollView
+                      ref={scrollRef}
+                      bottomOffset={20}
+                      contentContainerStyle={scrollContentStyle}
+                      style={scrollStyle}
+                    >
+                      <NodesTabContent
+                        nodes={nodes}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        serverId={serverId as string}
+                        workflowId={workflowId as string}
+                        theme={theme}
+                        targetNodeId={targetNodeId}
+                        sharedImageUri={sharedImageUri}
+                        onOpenLayoutConfig={handleOpenConfig}
+                      />
+                    </AdaptiveKeyboardAwareScrollView>
                 ) : (
                   <AIChatTab
                     ref={aiChatTabRef}
@@ -356,6 +509,7 @@ function RunWorkflowScreenContent() {
                 theme={theme}
                 targetNodeId={targetNodeId}
                 sharedImageUri={sharedImageUri}
+                onOpenLayoutConfig={handleOpenConfig}
               />
             ) : (
               <AIChatTab
@@ -376,6 +530,102 @@ function RunWorkflowScreenContent() {
         workflowId={workflowRecord?.id}
         onSelectMedia={handleSelectHistoryMedia}
       />
+
+      {/* UI Layout Customization Config Modal */}
+      <Modal isOpen={isConfigOpen} onClose={() => setIsConfigOpen(false)}>
+        <ModalBackdrop />
+        <ModalContent className="w-11/12 max-w-lg h-5/6 rounded-2xl bg-background-0">
+          <ModalHeader className="px-4 py-3 border-b border-background-100 dark:border-background-800 flex-row justify-between items-center">
+            <Text className="text-base font-bold text-typography-900">Configure UI Layout</Text>
+            <Pressable onPress={() => setIsConfigOpen(false)} className="p-1 active:bg-background-100 rounded-full">
+              <Icon as={X} size="sm" className="text-typography-500" />
+            </Pressable>
+          </ModalHeader>
+          <ModalBody className="p-0 flex-1">
+            <View className="flex-1">
+              <View className="px-4 py-2.5 bg-background-50 dark:bg-background-900">
+                <Text className="text-xs text-typography-500 leading-relaxed">
+                  Toggle visibility to keep the screen clean. Tap arrows to rearrange node forms cosmetically.
+                </Text>
+              </View>
+              <ScrollView className="flex-1 p-4">
+                {tempOrder.map((nodeId, index) => {
+                  const node = workflowRecord?.data[nodeId];
+                  if (!node) return null;
+                  const isVisible = tempVisibleIds.includes(nodeId);
+                  const title = node._meta?.title || node.class_type;
+
+                  return (
+                    <HStack
+                      key={nodeId}
+                      className="items-center justify-between py-2.5 border-b border-background-100 dark:border-background-800/40"
+                    >
+                      <HStack space="xs" className="flex-1 items-center mr-4">
+                        <Pressable onPress={() => toggleVisibility(nodeId)} className="p-1 mr-1">
+                          <Icon
+                            as={isVisible ? Eye : EyeOff}
+                            size="sm"
+                            className={isVisible ? 'text-primary-500' : 'text-typography-300'}
+                          />
+                        </Pressable>
+                        <VStack className="flex-1">
+                          <Text className="text-sm font-semibold text-typography-900" numberOfLines={1}>
+                            {title}
+                          </Text>
+                          <Text className="text-2xs text-typography-400">
+                            ID: {nodeId} • {node.class_type}
+                          </Text>
+                        </VStack>
+                      </HStack>
+                      <HStack space="xs" className="items-center">
+                        <Switch
+                          size="sm"
+                          value={isVisible}
+                          onValueChange={() => toggleVisibility(nodeId)}
+                        />
+                        <HStack space="2xs" className="ml-2">
+                          <Pressable
+                            disabled={index === 0}
+                            onPress={() => moveNode(index, 'up')}
+                            className={`p-1.5 rounded-lg active:bg-background-100 ${index === 0 ? 'opacity-30' : ''}`}
+                          >
+                            <Icon as={ArrowUp} size="sm" className="text-typography-600" />
+                          </Pressable>
+                          <Pressable
+                            disabled={index === tempOrder.length - 1}
+                            onPress={() => moveNode(index, 'down')}
+                            className={`p-1.5 rounded-lg active:bg-background-100 ${index === tempOrder.length - 1 ? 'opacity-30' : ''}`}
+                          >
+                            <Icon as={ArrowDown} size="sm" className="text-typography-600" />
+                          </Pressable>
+                        </HStack>
+                      </HStack>
+                    </HStack>
+                  );
+                })}
+              </ScrollView>
+              
+              <HStack space="sm" className="p-4 border-t border-background-100 dark:border-background-800">
+                <Button
+                  onPress={handleResetConfig}
+                  variant="outline"
+                  size="sm"
+                  className="flex-1 rounded-xl border-primary-500"
+                >
+                  <ButtonText className="text-primary-500 font-bold">Reset</ButtonText>
+                </Button>
+                <Button
+                  onPress={handleSaveConfig}
+                  size="sm"
+                  className="flex-1 rounded-xl bg-primary-500"
+                >
+                  <ButtonText className="text-white">Save Settings</ButtonText>
+                </Button>
+              </HStack>
+            </View>
+          </ModalBody>
+        </ModalContent>
+      </Modal>
     </View>
   );
 }
