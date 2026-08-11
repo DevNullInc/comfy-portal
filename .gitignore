@@ -91,3 +91,4 @@ check_history_temp.py
 play-store-credentials.json
 
 .env.local
+.idea/caches/deviceStreaming.xml
