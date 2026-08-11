@@ -842,7 +842,7 @@ export default function SettingScreen() {
             {/* Links and Legal */}
             <View className="bg-background-50 dark:bg-background-900 rounded-2xl p-4 shadow-sm">
               {/* GitHub Link */}
-              <Link href="https://github.com/ShunL12324/comfy-portal" asChild>
+              <Link href="https://github.com/DevNullInc/comfy-portal" asChild>
                 <Pressable className="flex-row items-center justify-between py-3 border-b border-background-100 dark:border-background-800">
                   <HStack space="sm" className="items-center">
                     <Icon as={GithubIcon} size="sm" className="text-typography-600 mr-2" />

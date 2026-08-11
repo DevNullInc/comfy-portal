@@ -77,7 +77,7 @@ export default function SubItem({ title, children, className, rightComponent, no
                   size="sm"
                   variant="solid"
                   onPress={() => {
-                    Linking.openURL('https://github.com/ShunL12324/comfy-portal/issues');
+                    Linking.openURL('https://github.com/DevNullInc/comfy-portal/issues');
                   }}
                   className="mt-2"
                 >

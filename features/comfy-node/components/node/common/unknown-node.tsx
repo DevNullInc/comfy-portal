@@ -30,7 +30,7 @@ export default function UnknownNode({ node, serverId, workflowId }: UnknownNodeP
 
   const handleRequestSupport = () => {
     const title = encodeURIComponent(`Node Support Request: ${node.class_type}`);
-    const url = `https://github.com/ShunL12324/comfy-portal/issues/new?template=node_support.yml&title=${title}&node-type=${encodeURIComponent(node.class_type)}`;
+    const url = `https://github.com/DevNullInc/comfy-portal/issues/new?template=node_support.yml&title=${title}&node-type=${encodeURIComponent(node.class_type)}`;
     Linking.openURL(url);
   };
 
