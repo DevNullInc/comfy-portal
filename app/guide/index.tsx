@@ -10,7 +10,7 @@ import { SceneMap, TabView } from 'react-native-tab-view';
 
 const LocalServerGuide = () => (
   <WebViewPage
-    uri="https://shunl12324.github.io/comfy-portal/guide/local-server"
+    uri="https://devnullinc.github.io/comfy-portal/guide/local-server"
     loadingTitle="Loading Local Server Guide..."
     slowLoadingTitle="Local Server Guide is taking longer than expected"
   />
@@ -18,7 +18,7 @@ const LocalServerGuide = () => (
 
 const RemoteServerGuide = () => (
   <WebViewPage
-    uri="https://shunl12324.github.io/comfy-portal/guide/remote-server"
+    uri="https://devnullinc.github.io/comfy-portal/guide/remote-server"
     loadingTitle="Loading Remote Server Guide..."
     slowLoadingTitle="Remote Server Guide is taking longer than expected"
   />
@@ -26,7 +26,7 @@ const RemoteServerGuide = () => (
 
 const RunPodServerGuide = () => (
   <WebViewPage
-    uri="https://shunl12324.github.io/comfy-portal/guide/remote-server-runpod"
+    uri="https://devnullinc.github.io/comfy-portal/guide/remote-server-runpod"
     loadingTitle="Loading RunPod Server Guide..."
     slowLoadingTitle="RunPod Server Guide is taking longer than expected"
   />

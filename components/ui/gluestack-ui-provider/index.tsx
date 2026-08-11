@@ -6,7 +6,7 @@ import { ToastProvider } from '@gluestack-ui/core/toast/creator';
 import { colorScheme as nativewindColorScheme, useColorScheme } from 'nativewind';
 import { config } from './config';
 
-type ModeType = 'light' | 'dark' | 'system';
+type ModeType = 'light' | 'dark' | 'system' | 'oled';
 
 export function GluestackUIProvider({
   mode = 'system',
@@ -30,7 +30,7 @@ export function GluestackUIProvider({
   // user had previously forced light/dark and we need to override).
   useEffect(() => {
     if (prevModeRef.current !== mode || mode !== 'system') {
-      nativewindColorScheme.set(mode);
+      nativewindColorScheme.set(mode === 'oled' ? 'dark' : mode);
     }
     prevModeRef.current = mode;
   }, [mode]);
@@ -46,7 +46,7 @@ export function GluestackUIProvider({
     <View
       style={[
         { flex: 1, height: '100%', width: '100%' },
-        resolvedMode === 'dark' ? config.dark : config.light,
+        resolvedMode === 'oled' ? config.oled : resolvedMode === 'dark' ? config.dark : config.light,
         style,
       ]}
     >

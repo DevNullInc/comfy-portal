@@ -315,5 +315,22 @@ export const Colors = {
       900: '#0029CC',  // 0, 41, 204
       950: '#001F99',  // 0, 31, 153 - Darkest tech blue
     }
+  },
+  oled: {
+    ...Colors.dark,
+    background: {
+      ...Colors.dark.background,
+      0: '#000000',
+      50: '#09090b',
+      100: '#18181b',
+      200: '#27272a',
+      300: '#3f3f46',
+    },
+    outline: {
+      ...Colors.dark.outline,
+      0: '#000000',
+      50: '#18181b',
+      100: '#27272a',
+    }
   }
 };

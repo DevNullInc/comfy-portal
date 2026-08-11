@@ -54,6 +54,15 @@ const CustomDarkTheme = {
   },
 };
 
+const CustomOledTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    background: '#000000',
+    card: '#000000',
+  },
+};
+
 const CustomLightTheme = {
   ...DefaultTheme,
   colors: {
@@ -139,7 +148,7 @@ function RootLayoutNav() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <KeyboardProvider>
         <GluestackUIProvider mode={preference}>
-          <ThemeProvider value={colorScheme === 'dark' ? CustomDarkTheme : CustomLightTheme}>
+          <ThemeProvider value={colorScheme === 'light' ? CustomLightTheme : colorScheme === 'oled' ? CustomOledTheme : CustomDarkTheme}>
               <BottomSheetModalProvider>
                 <Stack
                   screenOptions={{

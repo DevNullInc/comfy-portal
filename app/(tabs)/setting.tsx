@@ -389,9 +389,9 @@ export default function SettingScreen() {
                   <Text className="text-sm font-medium text-typography-800">App Theme</Text>
                 </HStack>
                 <SegmentedControl
-                  options={['light', 'dark', 'system']}
+                  options={['light', 'dark', 'oled', 'system']}
                   value={preference}
-                  onChange={(v) => setPreference(v as 'light' | 'dark' | 'system')}
+                  onChange={(v) => setPreference(v as 'light' | 'dark' | 'oled' | 'system')}
                 />
               </View>
             </View>

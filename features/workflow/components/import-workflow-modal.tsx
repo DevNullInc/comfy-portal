@@ -229,7 +229,7 @@ export function ImportWorkflowModal({ isOpen, onClose, serverId }: AddWorkflowMo
           <VStack space="sm">
             <HStack space="sm" className="items-center">
               <Text className="text-sm font-medium text-primary-400">Import Workflow</Text>
-              <Link href="https://shunl12324.github.io/comfy-portal/guide/workflow-json">
+              <Link href="https://devnullinc.github.io/comfy-portal/guide/workflow-json">
                 <LinkText className="text-xs">Where to get my workflow file?</LinkText>
               </Link>
             </HStack>

@@ -497,7 +497,7 @@ const ServerWorkflowsTab = ({ serverId, isActiveTab, onRequestClear }: ServerWor
                 Make sure <Text className="font-medium text-typography-700">comfy-portal-endpoint</Text> is installed
                 and at least one ComfyUI browser tab is connected.
               </Text>
-              <ExpoLink href="https://github.com/ShunL12324/comfy-portal-endpoint" className="self-center">
+              <ExpoLink href="https://github.com/DevNullInc/comfy-portal-endpoint" className="self-center">
                 <Text className="text-xs text-primary-500 underline">
                   Installation guide
                 </Text>
